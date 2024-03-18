@@ -7,18 +7,23 @@ from icecream import ic
 
 class FBHMDataset(Dataset):
     def __init__(self,root_dir,split) -> None:
-        splitfile = split + '.json'
+        splitfile = split + '.jsonl'
+        data = []
+        
         FILE_PATH = os.path.join(root_dir,splitfile)
         with open(FILE_PATH,'r',encoding='utf8') as f:
-            self.lb = json.load(f)
+            for line in f:
+                data.append(json.loads(line))
+        self.lb = data
+        self.root_dir = root_dir
     
     def __len__(self):
         return len(self.lb)
 
     def __getitem__(self,idx):
-        file_name = self.lb[idx]["id"] + ".png"
+        file_name = str(self.lb[idx]["id"]) + ".png"
         label = self.lb[idx]["label"]
-
+        
         image_path = os.path.join(self.root_dir,'img',file_name)
         image = Image.open(image_path).convert('RGB')  
 
