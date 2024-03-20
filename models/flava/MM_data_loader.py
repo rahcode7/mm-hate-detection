@@ -21,10 +21,11 @@ class FBHMDataset(Dataset):
         return len(self.lb)
 
     def __getitem__(self,idx):
-        file_name = str(self.lb[idx]["id"]) + ".png"
+        file_name = str(self.lb[idx]["img"]) # + ".png"
+        ic(file_name)
         label = self.lb[idx]["label"]
         
-        image_path = os.path.join(self.root_dir,'img',file_name)
+        image_path = os.path.join(self.root_dir,file_name)
         image = Image.open(image_path).convert('RGB')  
 
         return file_name,image,label

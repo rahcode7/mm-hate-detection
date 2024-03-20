@@ -8,11 +8,9 @@ from tqdm import tqdm
 from icecream import ic 
 
 if __name__ == "__main__":
-    
     # Read images
     IMG_PATH = "/Users/rahulmehta/Desktop/Research24/Challenges/MMHate/datasets/FB-HM/data/img" 
     OUTPUT_PATH = "/Users/rahulmehta/Desktop/Research24/Challenges/MMHate/datasets/results/FB-HM"
-    #01235.png
 
     # detect language - English, singlish etc
     reader = easyocr.Reader(['en'])
