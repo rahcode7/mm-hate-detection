@@ -53,7 +53,8 @@ def train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,s
     train_size = [] 
     c = 0 
     classification_head = ClassificationHead(768,num_classes=2)
-    
+    classification_head = classification_head.to(device)
+
 
     for idx, (files,images,labels) in enumerate(tqdm(train_dataloader)):
         c+=1
@@ -61,9 +62,9 @@ def train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,s
             break
         ic(images,labels)
         with accelerator.accumulate(model):
-            text = ["",""]
+            text = ["",""]#"",""]
             inputs = processor(text = text, images=images,return_tensors="pt",padding=True)
-            ic(inputs)
+            #ic(inputs)
             inputs = inputs.to(device)
             labels = torch.FloatTensor(labels)
             labels = labels.to(device)
@@ -75,12 +76,11 @@ def train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,s
 
             logits = classification_head(classifier_inputs)
 
-            predicted = logits.argmax(dim=1)
+            predicted = logits.argmax(dim=1).float()
             ic(predicted,labels)
             
             loss = criterion(predicted,labels)
             ic(loss)
-
 
             ## DDP code
             train_losses.append(accelerator.gather(loss))
@@ -93,15 +93,14 @@ def train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,s
             ic(train_batch_corrects)
             train_batch_corrects = torch.tensor(train_batch_corrects).to(device)
             # #ic(predicted,outputs.loss,train_batch_corrects)
-
-            # gathered_tensor = accelerator.gather(train_batch_corrects)
-            # train_corrects.append(gathered_tensor)
+            train_corrects.append(accelerator.gather(train_batch_corrects))
 
             label_size = torch.tensor(len(labels)).to(device)
             gathered_sizes = accelerator.gather(label_size)
             train_size.append(gathered_sizes)
 
             #ic(answers,len(labels),predicted,outputs.loss,gathered_sizes,train_size)
+            loss.requires_grad = True
             accelerator.backward(loss)
             # Gradient accumulation 
             #if (idx + 1)% ACCUMULATION_STEPS == 0:
@@ -139,6 +138,7 @@ def evaluate(epoch,model,val_dataloader,criterion,tokenizer,processor,device,acc
     val_size = [] 
     c = 0 
     classification_head = ClassificationHead(768,num_classes=2)
+    classification_head = classification_head.to(device)
     
     with torch.no_grad():
         model.eval()
@@ -149,19 +149,19 @@ def evaluate(epoch,model,val_dataloader,criterion,tokenizer,processor,device,acc
             
             text = ["",""]
             inputs = processor(text = text, images=images,return_tensors="pt",padding=True)
-            ic(inputs)
+            #ic(inputs)
             inputs = inputs.to(device)
             labels = torch.FloatTensor(labels)
             labels = labels.to(device)
             outputs = model(**inputs)
             #ic(outputs.multimodal_output.pooler_output)
-            ic(outputs.multimodal_output.pooler_output.shape)
+            #ic(outputs.multimodal_output.pooler_output.shape)
             
             classifier_inputs = outputs.multimodal_output.pooler_output.to(device)
 
             logits = classification_head(classifier_inputs)
 
-            predicted = logits.argmax(dim=1)
+            predicted = logits.argmax(dim=1).float()
             ic(predicted,labels)
             
             loss = criterion(predicted,labels)
@@ -175,6 +175,9 @@ def evaluate(epoch,model,val_dataloader,criterion,tokenizer,processor,device,acc
                                             j in zip(predicted, labels) if i == j])
             ic(val_batch_corrects)
             val_batch_corrects = torch.tensor(val_batch_corrects).to(device)
+
+            val_corrects.append(accelerator.gather(val_batch_corrects))
+
 
             label_size = torch.tensor(len(labels)).to(device)
             gathered_sizes = accelerator.gather(label_size)

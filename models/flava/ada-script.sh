@@ -17,7 +17,7 @@ EXP_NAME='base'
 RUN_TYPE='train' # train,inference
 DATE='20Mar'
 CHECKPOINT="checkpoints/checkpoints-$MODEL-$MACHINE_TYPE-$EXP_NAME-$DATE"
-NUM_GPUS=2
+NUM_GPUS=1
 
 if [ "$RUN_TYPE" = "train" ]; then
     mkdir checkpoints
@@ -26,14 +26,18 @@ if [ "$RUN_TYPE" = "train" ]; then
     export NUM_NODES=1
     export EPOCHS=1
     export LOCAL_RANK=0
-    export CUDA_VISIBLE_DEVICES=0,1
+    export CUDA_VISIBLE_DEVICES=0
     
     
     # Distributed base
     # torchrun --nnodes 1 --nproc_per_node 3 --rdzv_id=31459 --rdzv_backend=c10d --rdzv_endpoint=127.0.0.1:29900 \    
 
     # BLIP base + lr
-    accelerate launch --multi_gpu --num_processes=$NUM_GPUS models/flava/flava-train.py --num_epochs $EPOCHS --train_batch_size 4 --val_batch_size 4 --train_dir datasets/FB-HM/data \
+    # accelerate launch --multi_gpu --num_processes=$NUM_GPUS models/flava/flava-train.py --num_epochs $EPOCHS --train_batch_size 2 --val_batch_size 2 --train_dir datasets/FB-HM/data \
+    #     --val_dir datasets/FB-HM/data --checkpoint_dir  $CHECKPOINT  \
+    #     --experiment_name ada-$MODEL-$EXP_NAME-$DATE --wandb_status online --accumulation_steps 4 --lr 1
+
+    accelerate launch --num_processes=$NUM_GPUS models/flava/flava-train.py --num_epochs $EPOCHS --train_batch_size 2 --val_batch_size 2 --train_dir datasets/FB-HM/data \
         --val_dir datasets/FB-HM/data --checkpoint_dir  $CHECKPOINT  \
         --experiment_name ada-$MODEL-$EXP_NAME-$DATE --wandb_status online --accumulation_steps 4 --lr 1
 
