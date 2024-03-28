@@ -59,7 +59,7 @@ def train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,s
     classification_head = classification_head.to(device)
 
 
-    for idx, (files,images,labels) in enumerate(tqdm(train_dataloader)):
+    for idx, (files,images,text,labels) in enumerate(tqdm(train_dataloader)):
         # c+=1
         # if c>MAX_CNT:
         #     break
@@ -68,7 +68,7 @@ def train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,s
         with accelerator.accumulate(model):
 
             # Insert text if not available
-            text = ["","","",""]
+            #text = ["","","",""]
 
             inputs = processor(text = text, images=images,return_tensors="pt",padding=True)
             #ic(inputs)
@@ -149,13 +149,13 @@ def evaluate(epoch,model,val_dataloader,criterion,tokenizer,processor,device,acc
     
     with torch.no_grad():
         model.eval()
-        for idx, (files,images,labels) in enumerate(tqdm(val_dataloader)):
+        for idx, (files,images,text,labels) in enumerate(tqdm(val_dataloader)):
             # c+=1
             # if c>MAX_CNT:
             #     break
             
             # Insert text if not available
-            text = ["","","",""]
+            #text = ["","","",""]
 
             inputs = processor(text = text, images=images,return_tensors="pt",padding=True)
             #ic(inputs)

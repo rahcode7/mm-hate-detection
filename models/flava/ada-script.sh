@@ -15,18 +15,18 @@ MODEL='flava'
 MACHINE_TYPE='ddp' # ddp or dp or cpu
 EXP_NAME='base' 
 RUN_TYPE='train' # train,inference
-DATE='20Mar'
+DATE='28Mar'
 CHECKPOINT="checkpoints/checkpoints-$MODEL-$MACHINE_TYPE-$EXP_NAME-$DATE"
-NUM_GPUS=1
+NUM_GPUS=2
 
 if [ "$RUN_TYPE" = "train" ]; then
     mkdir checkpoints
     rm -rf $CHECKPOINT
     mkdir $CHECKPOINT
     export NUM_NODES=1
-    export EPOCHS=1
+    export EPOCHS=5
     export LOCAL_RANK=0
-    export CUDA_VISIBLE_DEVICES=0
+    export CUDA_VISIBLE_DEVICES=0,1
     
     
     # Distributed base
@@ -37,7 +37,7 @@ if [ "$RUN_TYPE" = "train" ]; then
     #     --val_dir datasets/FB-HM/data --checkpoint_dir  $CHECKPOINT  \
     #     --experiment_name ada-$MODEL-$EXP_NAME-$DATE --wandb_status online --accumulation_steps 4 --lr 1
 
-    accelerate launch --num_processes=$NUM_GPUS models/flava/flava-train.py --num_epochs $EPOCHS --train_batch_size 2 --val_batch_size 2 --train_dir datasets/FB-HM/data \
+    accelerate launch --multi_gpu --num_processes=$NUM_GPUS models/flava/flava-train.py --num_epochs $EPOCHS --train_batch_size 4 --val_batch_size 4 --train_dir datasets/FB-HM/data \
         --val_dir datasets/FB-HM/data --checkpoint_dir  $CHECKPOINT  \
         --experiment_name ada-$MODEL-$EXP_NAME-$DATE --wandb_status online --accumulation_steps 4 --lr 1
 

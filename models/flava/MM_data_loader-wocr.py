@@ -38,19 +38,19 @@ class FBHMDataset(Dataset):
         image_path = os.path.join(self.root_dir,file_name)
         image = Image.open(image_path).convert('RGB')  
 
-        ocr_text = self.ocr[idx][""]
+        ocr_text = self.ocr[idx][file_name]
 
-        return file_name,image,text,label
+        return file_name,image,ocr_text,label
 
 def collate_fn(batch):
     file_list,image_list,text_list,label_list = [],[],[],[]
 
     batch = list(filter (lambda x:x is not None, batch))
     
-    for file,image,text,label in batch:
+    for file,image,ocr_text,label in batch:
         file_list.append(file)
         image_list.append(image)
-        text_list.append(text)
+        text_list.append(ocr_text)
         label_list.append(label)    
     return file_list,image_list,text_list,label_list
 

@@ -22,8 +22,9 @@ class FBHMDataset(Dataset):
 
     def __getitem__(self,idx):
         file_name = str(self.lb[idx]["img"]) # + ".png"
-        ic(file_name)
+        
         label = self.lb[idx]["label"]
+        #ic(file_name,idx,label,self.lb[idx]["id"])
         
         image_path = os.path.join(self.root_dir,file_name)
         image = Image.open(image_path).convert('RGB')  
