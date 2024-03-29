@@ -4,7 +4,7 @@
 #SBATCH -A research
 #SBATCH --output=runs/flava/flava.txt
 #SBATCH -n 10
-#SBATCH --gres=gpu:4
+#SBATCH --gres=gpu:3
 #SBATCH --mem=40G
 #SBATCH --time=4-00:00:00
 #SBATCH --mail-type=END
@@ -17,7 +17,7 @@ EXP_NAME='base'
 RUN_TYPE='train' # train,inference
 DATE='29Mar'
 CHECKPOINT="checkpoints/checkpoints-$MODEL-$MACHINE_TYPE-$EXP_NAME-$DATE"
-NUM_GPUS=4
+NUM_GPUS=3
 
 if [ "$RUN_TYPE" = "train" ]; then
     mkdir checkpoints
@@ -26,7 +26,7 @@ if [ "$RUN_TYPE" = "train" ]; then
     export NUM_NODES=1
     export EPOCHS=5
     export LOCAL_RANK=0
-    export CUDA_VISIBLE_DEVICES=0,1,2,3
+    export CUDA_VISIBLE_DEVICES=0,1,2
     
     
     # Distributed base

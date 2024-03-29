@@ -40,7 +40,7 @@ class FBHMDataset(Dataset):
 
     def __getitem__(self,idx):
         file_name = str(self.lb[idx]["img"]) # + ".png"
-        ic(file_name)
+        
         label = self.lb[idx]["label"]
         
         image_path = os.path.join(self.root_dir,file_name)
@@ -48,12 +48,11 @@ class FBHMDataset(Dataset):
         vals = ast.literal_eval(self.ocr[file_name[4:]])
         ocr_text = ""
         for item in vals:
-            ocr_text +=  " " + item[1]
+            ocr_text +=  ". " + item[1]
         
         # keep alphanum
         ocr_text  = re.sub(r'\W+', ' ', ocr_text).strip()
-
-        ic(ocr_text)
+        ic(file_name,ocr_text)
 
         return file_name,image,ocr_text,label
 

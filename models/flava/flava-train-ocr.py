@@ -47,7 +47,7 @@ class ClassificationHead(nn.Module):
         return self.fc(x)
 
 
-MAX_CNT=100
+MAX_CNT=1
 
 def train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,scheduler,device,accelerator,MACHINE_TYPE,ACCUMULATION_STEPS,LR_FLAG):
     model.train()
@@ -61,10 +61,10 @@ def train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,s
 
 
     for idx, (files,images,text,labels) in enumerate(tqdm(train_dataloader)):
-        # c+=1
-        # if c>MAX_CNT:
-        #     break
-        #ic(files,images,labels)
+        c+=1
+        if c>MAX_CNT:
+            break
+        ic(files,images,labels)
 
         with accelerator.accumulate(model):
 
@@ -82,13 +82,18 @@ def train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,s
             
             classifier_inputs = outputs.multimodal_output.pooler_output.to(device)
 
-            logits = classification_head(classifier_inputs)
+            logits = classification_head(classifier_inputs).cpu()
+            ic(logits)        
 
-            predicted = logits.argmax(dim=1).float()
-            #ic(predicted,labels)
-            
-            labels = labels.unsqueeze(1)
-            loss = criterion(logits,labels)
+
+            probs = torch.sigmoid(logits)
+            predicted = np.where(probs >0.5,1,0)
+            predicted = predicted.squeeze().tolist()
+
+            #ic(logits,logits.argmax(dim=1).float(),torch.sigmoid(logits))
+
+            ic(predicted,labels)
+            loss = criterion(logits,labels).cpu()
             ic(loss)
 
             ## DDP code
@@ -170,13 +175,16 @@ def evaluate(epoch,model,val_dataloader,criterion,tokenizer,processor,device,acc
             
             classifier_inputs = outputs.multimodal_output.pooler_output.to(device)
 
-            logits = classification_head(classifier_inputs)
+            logits = classification_head(classifier_inputs).cpu()
 
-            predicted = logits.argmax(dim=1).float()
-            #ic(predicted,labels)
+            
+            probs = torch.sigmoid(logits)
+            predicted = np.where(probs >0.5,1,0)
+            predicted = predicted.squeeze().tolist()
             
             labels = labels.unsqueeze(1)
             loss = criterion(logits,labels)
+            ic(loss,predicted,labels)
 
             ## DDP code
             val_losses.append(accelerator.gather(loss))
