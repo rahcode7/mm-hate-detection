@@ -4,6 +4,9 @@ import os
 from PIL import Image
 import json 
 from icecream import ic 
+import ast 
+import re
+
 
 class FBHMDataset(Dataset):
     def __init__(self,root_dir,split) -> None:
@@ -22,8 +25,13 @@ class FBHMDataset(Dataset):
         with open(FILE_PATH,'r',encoding='utf8') as f:
             for line in f:
                 data_ocr.append(json.loads(line))
-        self.ocr = data_ocr
 
+        single_dict = {}
+        for d in data_ocr:
+            single_dict.update(d)
+
+        self.ocr = single_dict
+        
 
         self.root_dir = root_dir
     
@@ -37,8 +45,15 @@ class FBHMDataset(Dataset):
         
         image_path = os.path.join(self.root_dir,file_name)
         image = Image.open(image_path).convert('RGB')  
+        vals = ast.literal_eval(self.ocr[file_name[4:]])
+        ocr_text = ""
+        for item in vals:
+            ocr_text +=  " " + item[1]
+        
+        # keep alphanum
+        ocr_text  = re.sub(r'\W+', ' ', ocr_text).strip()
 
-        ocr_text = self.ocr[idx][file_name]
+        ic(ocr_text)
 
         return file_name,image,ocr_text,label
 

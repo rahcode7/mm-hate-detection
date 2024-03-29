@@ -4,7 +4,7 @@
 #SBATCH -A research
 #SBATCH --output=runs/flava/flava.txt
 #SBATCH -n 10
-#SBATCH --gres=gpu:2
+#SBATCH --gres=gpu:4
 #SBATCH --mem=40G
 #SBATCH --time=4-00:00:00
 #SBATCH --mail-type=END
@@ -15,9 +15,9 @@ MODEL='flava'
 MACHINE_TYPE='ddp' # ddp or dp or cpu
 EXP_NAME='base' 
 RUN_TYPE='train' # train,inference
-DATE='28Mar'
+DATE='29Mar'
 CHECKPOINT="checkpoints/checkpoints-$MODEL-$MACHINE_TYPE-$EXP_NAME-$DATE"
-NUM_GPUS=2
+NUM_GPUS=4
 
 if [ "$RUN_TYPE" = "train" ]; then
     mkdir checkpoints
@@ -26,7 +26,7 @@ if [ "$RUN_TYPE" = "train" ]; then
     export NUM_NODES=1
     export EPOCHS=5
     export LOCAL_RANK=0
-    export CUDA_VISIBLE_DEVICES=0,1
+    export CUDA_VISIBLE_DEVICES=0,1,2,3
     
     
     # Distributed base
@@ -37,9 +37,22 @@ if [ "$RUN_TYPE" = "train" ]; then
     #     --val_dir datasets/FB-HM/data --checkpoint_dir  $CHECKPOINT  \
     #     --experiment_name ada-$MODEL-$EXP_NAME-$DATE --wandb_status online --accumulation_steps 4 --lr 1
 
-    accelerate launch --multi_gpu --num_processes=$NUM_GPUS models/flava/flava-train.py --num_epochs $EPOCHS --train_batch_size 4 --val_batch_size 4 --train_dir datasets/FB-HM/data \
-        --val_dir datasets/FB-HM/data --checkpoint_dir  $CHECKPOINT  \
-        --experiment_name ada-$MODEL-$EXP_NAME-$DATE --wandb_status online --accumulation_steps 4 --lr 1
+    # torchrun --nnodes 1 --nproc_per_node  $NUM_GPUS --rdzv_id=31459 --rdzv_backend=c10d --rdzv_endpoint=127.0.0.1:29900 \    
+    # python models/flava/flava-train.py --num_epochs $EPOCHS --train_batch_size 4 --val_batch_size 4 --train_dir datasets/FB-HM/data \
+    #     --val_dir datasets/FB-HM/data --checkpoint_dir  $CHECKPOINT  \
+    #     --experiment_name ada-$MODEL-$EXP_NAME-$DATE --wandb_status online --accumulation_steps 4 --lr 1
+
+
+    
+    # accelerate launch --multi_gpu --num_processes=$NUM_GPUS models/flava/flava-train.py --num_epochs $EPOCHS --train_batch_size 4 --val_batch_size 4 --train_dir datasets/FB-HM/data \
+    #      --val_dir datasets/FB-HM/data --checkpoint_dir  $CHECKPOINT  \
+    #      --experiment_name ada-$MODEL-$EXP_NAME-$DATE --wandb_status disabled --accumulation_steps 4 --lr 0
+
+    # OCR 
+    accelerate launch --multi_gpu --num_processes=$NUM_GPUS models/flava/flava-train-ocr.py --num_epochs $EPOCHS --train_batch_size 4 --val_batch_size 4 --train_dir datasets/FB-HM/data \
+         --val_dir datasets/FB-HM/data --checkpoint_dir  $CHECKPOINT  \
+         --experiment_name ada-$MODEL-$EXP_NAME-$DATE --wandb_status disabled --accumulation_steps 4 --lr 1
+    
 
     # MAC single
     #  accelerate launch  --num_processes=$NUM_GPUS models/flava/flava-train.py --num_epochs $EPOCHS --train_batch_size 2 --val_batch_size 2 --train_dir /Users/rahulmehta/Desktop/Research24/Challenges/MMHate/datasets/FB-HM/data \

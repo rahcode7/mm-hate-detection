@@ -13,6 +13,8 @@ import wandb
 import os 
 from torch.utils.data import DataLoader
 from accelerate import Accelerator
+from accelerate import DistributedDataParallelKwargs
+
 import bitsandbytes as bnb
 from torchmultimodal.models.flava.model import flava_model_for_classification
 from MM_data_loader import FBHMDataset,collate_fn
@@ -46,7 +48,7 @@ class ClassificationHead(nn.Module):
         return self.fc(x)
 
 
-MAX_CNT=10000
+MAX_CNT=100000
 
 def train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,scheduler,device,accelerator,MACHINE_TYPE,ACCUMULATION_STEPS,LR_FLAG):
     model.train()
@@ -55,14 +57,14 @@ def train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,s
     train_corrects = []
     train_size = [] 
     c = 0 
-    classification_head = ClassificationHead(768,num_classes=2)
+    classification_head = ClassificationHead(768,num_classes=1)
     classification_head = classification_head.to(device)
 
 
     for idx, (files,images,labels) in enumerate(tqdm(train_dataloader)):
-        # c+=1
-        # if c>MAX_CNT:
-        #     break
+        c+=1
+        if c>MAX_CNT:
+            break
         #ic(files,images,labels)
 
         with accelerator.accumulate(model):
@@ -82,12 +84,13 @@ def train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,s
             classifier_inputs = outputs.multimodal_output.pooler_output.to(device)
 
             logits = classification_head(classifier_inputs)
-
+            #ic(logits)  
             predicted = logits.argmax(dim=1).float()
-            #ic(predicted,labels)
             
-            loss = criterion(predicted,labels)
-            ic(loss)
+            labels = labels.unsqueeze(1)
+            loss = criterion(logits,labels)
+            #ic(logits,predicted,labels)
+            #ic(loss)
 
             ## DDP code
             train_losses.append(accelerator.gather(loss))
@@ -107,7 +110,7 @@ def train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,s
             train_size.append(gathered_sizes)
 
             #ic(answers,len(labels),predicted,outputs.loss,gathered_sizes,train_size)
-            loss.requires_grad = True
+            #loss.requires_grad = True
             accelerator.backward(loss)
             # Gradient accumulation 
             #if (idx + 1)% ACCUMULATION_STEPS == 0:
@@ -144,15 +147,15 @@ def evaluate(epoch,model,val_dataloader,criterion,tokenizer,processor,device,acc
     val_corrects = []
     val_size = [] 
     c = 0 
-    classification_head = ClassificationHead(768,num_classes=2)
+    classification_head = ClassificationHead(768,num_classes=1)
     classification_head = classification_head.to(device)
     
     with torch.no_grad():
         model.eval()
         for idx, (files,images,labels) in enumerate(tqdm(val_dataloader)):
-            # c+=1
-            # if c>MAX_CNT:
-            #     break
+            c+=1
+            if c>MAX_CNT:
+                break
             
             # Insert text if not available
             text = ["","","",""]
@@ -167,14 +170,17 @@ def evaluate(epoch,model,val_dataloader,criterion,tokenizer,processor,device,acc
             #ic(outputs.multimodal_output.pooler_output.shape)
             
             classifier_inputs = outputs.multimodal_output.pooler_output.to(device)
-
             logits = classification_head(classifier_inputs)
 
             predicted = logits.argmax(dim=1).float()
             #ic(predicted,labels)
             
-            loss = criterion(predicted,labels)
+            labels = labels.unsqueeze(1)
+            loss = criterion(logits,labels)
 
+            #ic(logits,predicted,labels)
+            #ic(loss)
+            
             ## DDP code
             val_losses.append(accelerator.gather(loss))
             #ic(outputs.last_hidden_state)
@@ -223,10 +229,15 @@ def run_ddp_accelerate(args):
     LR_FLAG=False
     if args.lr == 1: LR_FLAG=True 
 
-    accelerator = Accelerator(gradient_accumulation_steps=ACCUMULATION_STEPS)
+    
+    #accelerator = Accelerator(gradient_accumulation_steps=ACCUMULATION_STEPS,kwargs_handlers=DistributedDataParallelKwargs(find_unused_parameters=True))
+    ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
+    accelerator = Accelerator(gradient_accumulation_steps=ACCUMULATION_STEPS,kwargs_handlers=[ddp_kwargs])
+    
+    #accelerator = Accelerator(gradient_accumulation_steps=ACCUMULATION_STEPS)
 
     if accelerator.is_main_process:
-        wandb.init(project='CircuitBLIP',
+        wandb.init(project='MMHate',
                 config = {
                 'learning_rate':LEARNING_RATE,
                 'epochs':EPOCHS,
@@ -261,7 +272,7 @@ def run_ddp_accelerate(args):
     processor = AutoProcessor.from_pretrained("facebook/flava-full")
 
     train_dataset = FBHMDataset(root_dir=TRAIN_DIR,split='train')
-    train_dataloader = DataLoader(train_dataset, shuffle=False, batch_size=TRAIN_BATCH_SIZE, collate_fn= collate_fn,pin_memory=False)
+    train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=TRAIN_BATCH_SIZE, collate_fn= collate_fn,pin_memory=False)
 
     val_dataset = FBHMDataset(root_dir=VAL_DIR, split='dev')
     val_dataloader = DataLoader(val_dataset, shuffle=False, batch_size=VAL_BATCH_SIZE, collate_fn= collate_fn,pin_memory=False)
@@ -274,7 +285,10 @@ def run_ddp_accelerate(args):
         
     device = accelerator.device
     ic(device)
-    criterion = torch.nn.CrossEntropyLoss()
+
+    criterion = nn.BCEWithLogitsLoss()
+    #criterion = nn.BCELoss()
+    #criterion = torch.nn.CrossEntropyLoss()
    
     if LR_FLAG:
         scheduler = get_cosine_schedule_with_warmup(optimizer, num_warmup_steps=3, num_training_steps=10)
@@ -282,7 +296,7 @@ def run_ddp_accelerate(args):
         scheduler = ""
         
 
-    criterion = nn.BCELoss()
+    # criterion = nn.BCELoss()
 
     train_dataloader, val_dataloader, model, optimizer,scheduler = accelerator.prepare(
         train_dataloader,val_dataloader, model, optimizer,scheduler
@@ -425,7 +439,7 @@ if __name__ == "__main__":
     parser.add_argument('--val_dir', help='Val directory')
     parser.add_argument('--checkpoint_dir', help='Val  directory')
     parser.add_argument('--experiment_name', help='exp name')
-    parser.add_argument('--wandb_status',default='online', help='wandb set to online for online sync else disabled')
+    parser.add_argument('--wandb_status',default='disabled', help='wandb set to online for online sync else disabled')
     parser.add_argument('--accumulation_steps',type=int,default=0,help="acc steps")
     parser.add_argument('--lr',type=int,default=0,help="lr")
 
