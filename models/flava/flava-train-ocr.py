@@ -47,7 +47,7 @@ class ClassificationHead(nn.Module):
         return self.fc(x)
 
 
-MAX_CNT=1
+MAX_CNT=10000
 
 def train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,scheduler,device,accelerator,MACHINE_TYPE,ACCUMULATION_STEPS,LR_FLAG):
     model.train()
@@ -64,7 +64,7 @@ def train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,s
         c+=1
         if c>MAX_CNT:
             break
-        ic(files,images,labels)
+        #ic(files,images,labels)
 
         with accelerator.accumulate(model):
 
@@ -83,18 +83,21 @@ def train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,s
             classifier_inputs = outputs.multimodal_output.pooler_output.to(device)
 
             logits = classification_head(classifier_inputs).cpu()
-            ic(logits)        
+            #ic(logits)        
 
 
             probs = torch.sigmoid(logits)
             predicted = np.where(probs >0.5,1,0)
-            predicted = predicted.squeeze().tolist()
+            predicted = torch.Tensor(predicted.squeeze().tolist()).to(device)
+
 
             #ic(logits,logits.argmax(dim=1).float(),torch.sigmoid(logits))
 
-            ic(predicted,labels)
-            loss = criterion(logits,labels).cpu()
-            ic(loss)
+            #ic(predicted,labels)
+
+            labels = labels.unsqueeze(1)
+            loss = criterion(logits.to(device),labels)
+            #ic(loss)
 
             ## DDP code
             train_losses.append(accelerator.gather(loss))
@@ -180,11 +183,11 @@ def evaluate(epoch,model,val_dataloader,criterion,tokenizer,processor,device,acc
             
             probs = torch.sigmoid(logits)
             predicted = np.where(probs >0.5,1,0)
-            predicted = predicted.squeeze().tolist()
+            predicted = torch.Tensor(predicted.squeeze().tolist()).to(device)
             
             labels = labels.unsqueeze(1)
-            loss = criterion(logits,labels)
-            ic(loss,predicted,labels)
+            loss = criterion(logits.to(device),labels) # .cpu()
+            #ic(loss,predicted,labels)
 
             ## DDP code
             val_losses.append(accelerator.gather(loss))
