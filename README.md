@@ -21,6 +21,9 @@ scp $LOCAL/datasets/FB-HM/data/dev.jsonl $ADA/datasets/FB-HM/data
 
 scp $LOCAL/datasets/FB-HM/data/ocr-fbhm.json $ADA/datasets/FB-HM/data
 
+scp $LOCAL/mm-hate-detection/models/flava/main.py $ADA/models/flava
+
+scp -r Users/rahulmehta/Desktop/Research24/Challenges/MMHate/AISG-Online-Safety-Challenge-Submission-Guide/local_test/test_images $ADA/datasets
 ##### Install packages
 python -m pip install torchmultimodal-nightly
 
@@ -38,8 +41,10 @@ sbatch models/flava/ada-script.sh
 squeue -u $USER
 cat runs/flava/flava.txt
 
-
-
+### Inference
+python models/flava/main.py 
+test_images/8b52c3.png
+test_images/8b52el.png
 
 
 #### Debugging errors

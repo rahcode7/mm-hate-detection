@@ -51,7 +51,7 @@ if [ "$RUN_TYPE" = "train" ]; then
     # OCR 
     accelerate launch --multi_gpu --num_processes=$NUM_GPUS models/flava/flava-train-ocr.py --num_epochs $EPOCHS --train_batch_size 4 --val_batch_size 4 --train_dir datasets/FB-HM/data \
          --val_dir datasets/FB-HM/data --checkpoint_dir  $CHECKPOINT  \
-         --experiment_name ada-$MODEL-$EXP_NAME-$DATE --wandb_status disabled --accumulation_steps 4 --lr 1
+         --experiment_name ada-$MODEL-$EXP_NAME-$DATE --wandb_status disabled --accumulation_steps 4 --lr 0
     
 
     # MAC single
