@@ -30,6 +30,15 @@ def get_meme_text(reader,image_path):
     # Later - Add coordinates to return for inpainting 
     return text
     
+class ClassificationHead(nn.Module):
+    def __init__(self, input_size, num_classes):
+        super(ClassificationHead, self).__init__()
+        self.fc = nn.Linear(input_size, num_classes)
+    
+    def forward(self, x):
+        return self.fc(x)
+
+
 def classifier(model_dict,checkpoint_file,device,image,text):
     tokenizer = model_dict['tokenizer']
     model = model_dict['model']
@@ -52,19 +61,21 @@ def classifier(model_dict,checkpoint_file,device,image,text):
     inputs = inputs.to(device)
 
     outputs = model(**inputs)
-    ic(outputs)
+    #ic(outputs)s
 
-    # classification_head = ClassificationHead(768,num_classes=1)
-    # classification_head = classification_head.to(device)
-    # classifier_inputs = outputs.multimodal_output.pooler_output.to(device)
-    # logits = classification_head(classifier_inputs).cpu()
+    classification_head = ClassificationHead(768,num_classes=1)
+    classification_head = classification_head.to(device)
+    classifier_inputs = outputs.multimodal_output.pooler_output.to(device)
+    logits = classification_head(classifier_inputs).cpu()
 
-    # probs = torch.sigmoid(logits)
-    # predicted = np.where(probs >0.5,1,0)
-    # predicted = torch.Tensor(predicted.squeeze().tolist()) # .to(device)
+    probs = torch.sigmoid(logits)
+    probs.squeeze()
+    predicted = np.where(probs >0.5,1,0).tolist()
+    #predicted = torch.Tensor(predicted.squeeze().tolist()) # .to(device)
 
-    #return probs, predicted
-    return "",""
+    ic(probs,predicted)
+    return probs, predicted
+    #return "",""
 
 def process_line_by_line(checkpoint_file,reader,device,model_dict,image_path):
     ic("Processing image")
