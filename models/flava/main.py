@@ -69,7 +69,7 @@ def classifier(model_dict,checkpoint_file,device,image,text):
     logits = classification_head(classifier_inputs).cpu()
 
     probs = torch.sigmoid(logits)
-    probs.squeeze()
+    probs = probs.squeeze()
     predicted = np.where(probs >0.5,1,0).tolist()
     #predicted = torch.Tensor(predicted.squeeze().tolist()) # .to(device)
 
@@ -85,7 +85,6 @@ def process_line_by_line(checkpoint_file,reader,device,model_dict,image_path):
     proba, label = classifier(model_dict,checkpoint_file,device,image=image, text=text)
 
     return proba, label
-
 
 if __name__ == "__main__":
     reader = easyocr.Reader(['en'])
