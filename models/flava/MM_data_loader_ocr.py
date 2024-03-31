@@ -62,7 +62,7 @@ class FBHMDataset(Dataset):
 
         # keep alphanum
         ocr_text  = re.sub(r'\W+', ' ', ocr_text).strip()
-        #ic(file_name,ocr_text)
+        #ic(file_name,image_path,ocr_text,label)
 
         return file_name,image,ocr_text,label
 

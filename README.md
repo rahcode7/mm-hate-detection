@@ -52,11 +52,23 @@ python models/flava/main.py
 test_images/8b52c3.png
 test_images/8b52el.png
 
+## DOCKER 
+###### 1. Get requirements
+cd mm-hate-detection
+pip install pipreqs 
+pipreqs . 
+scp $ADA/requirements.txt $LOCAL/mm-hate-detection
 
-### DOCKER 
-docker build -t sample_mine .
-docker save sample_mine | gzip > mine_container.tar.gz
+###### 2. Get trained checkpoint file
+scp -r $ADA/checkpoints/checkpoints-flava-ddp-base-29Mar $LOCAL/checkpoints
 
+###### 3. Move main.py to submission
+cp $ADA/mm-hate-detection/models/flava/main.py $LOCAL/submissions/submission1
+cp -r $ADA/checkpoints $LOCAL/submissions/submission1
+
+###### 3. DOCKER build image from submission folder
+docker build -t submission1 .
+docker save submission1 | gzip > submission1.tar.gz
 
 
 #### Debugging errors

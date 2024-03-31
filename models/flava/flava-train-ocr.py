@@ -42,13 +42,18 @@ def load_ckp(checkpoint_fpath, model, optimizer):
 class ClassificationHead(nn.Module):
     def __init__(self, input_size, num_classes):
         super(ClassificationHead, self).__init__()
+        #self.dropout = nn.Dropout(0.5)
         self.fc = nn.Linear(input_size, num_classes)
     
     def forward(self, x):
+        #outputs = self.dropout(x)
+        #outputs = self.fc(outputs)
+
+        #return outputs
+
         return self.fc(x)
 
-
-MAX_CNT=5
+MAX_CNT=10000
 
 def flatten(xss):
     return [x for xs in xss for x in xs]
@@ -64,7 +69,6 @@ def train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,s
     c = 0 
     classification_head = ClassificationHead(768,num_classes=1)
     classification_head = classification_head.to(device)
-
 
     for idx, (files,images,text,labels) in enumerate(tqdm(train_dataloader)):
         c+=1
@@ -90,10 +94,14 @@ def train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,s
             #ic(outputs.multimodal_output.pooler_output)
             #ic(outputs.multimodal_output.pooler_output.shape)
             
+            #ic(outputs.multimodal_output.pooler_output.shape,outputs.multimodal_output.last_hidden_state.shape)
+            # Average across the dimension
+            #outputs.multimodal_output.last_hidden_state.to(device) # Last hidden state
+
             classifier_inputs = outputs.multimodal_output.pooler_output.to(device)
 
             logits = classification_head(classifier_inputs).cpu()
-            #ic(logits)        
+            #ic(logits,labels)        
 
 
             probs = torch.sigmoid(logits)
@@ -101,11 +109,9 @@ def train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,s
             # Probability list and labels list for AUROC
             probs_list.append(probs.squeeze().tolist())
             
-
-
             predicted = np.where(probs >0.5,1,0)
             predicted = torch.Tensor(predicted.squeeze().tolist()).to(device)
-
+            #ic(logits,probs,predicted,labels)
 
             #ic(logits,logits.argmax(dim=1).float(),torch.sigmoid(logits))
 
@@ -161,8 +167,8 @@ def train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,s
     train_accuracy =  total_corrects / total_train_size
 
     # AUROC 
-    ic(probs_list)
-    ic(labels_list)
+    #ic(probs_list)
+    #ic(labels_list)
     labels_list = flatten(labels_list)
     probs_list = flatten(probs_list)
 
@@ -209,7 +215,10 @@ def evaluate(epoch,model,val_dataloader,criterion,tokenizer,processor,device,acc
             #ic(outputs.multimodal_output.pooler_output)
             #ic(outputs.multimodal_output.pooler_output.shape)
             
-            classifier_inputs = outputs.multimodal_output.pooler_output.to(device)
+            #ic(outputs.multimodal_output.pooler_output.shape,outputs.multimodal_output.last_hidden_state.shape)
+
+            #classifier_inputs = outputs.multimodal_output.last_hidden_state.to(device) # Last hidden state
+            classifier_inputs = outputs.multimodal_output.pooler_output.to(device) # CLS token o/p
 
             logits = classification_head(classifier_inputs).cpu()
 
@@ -328,7 +337,7 @@ def run_ddp_accelerate(args):
     val_dataloader = DataLoader(val_dataset, shuffle=False, batch_size=VAL_BATCH_SIZE, collate_fn= collate_fn,pin_memory=False)
 
 
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.001, weight_decay=0.01)
+    optimizer = torch.optim.SGD(model.parameters(), lr=1e-4, weight_decay=0.01)
     #optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, weight_decay=0.05)
     #optimizer = bnb.optim.Adam8bit(model.parameters(), lr=LEARNING_RATE, weight_decay=0.05)
    
@@ -418,7 +427,7 @@ def run_ddp_accelerate(args):
         logger.info(f'Epoch {epoch} Val loss : {val_loss} Val accuracy : {val_accuracy} Val AUROC : {val_auroc}')
 
         
-        ic(epoch,train_loss,val_loss,train_accuracy,val_accuracy)
+        ic(epoch,train_loss,val_loss,train_accuracy,val_accuracy,train_auroc,val_auroc)
         
         if accelerator.is_main_process:
             ic("True")
