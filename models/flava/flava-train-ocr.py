@@ -337,7 +337,7 @@ def run_ddp_accelerate(args):
     val_dataloader = DataLoader(val_dataset, shuffle=False, batch_size=VAL_BATCH_SIZE, collate_fn= collate_fn,pin_memory=False)
 
 
-    optimizer = torch.optim.SGD(model.parameters(), lr=1e-4, weight_decay=0.01)
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.001, weight_decay=0.01)
     #optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, weight_decay=0.05)
     #optimizer = bnb.optim.Adam8bit(model.parameters(), lr=LEARNING_RATE, weight_decay=0.05)
    
@@ -422,14 +422,13 @@ def run_ddp_accelerate(args):
 
         train_loss,train_accuracy,train_auroc = train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,scheduler,device,accelerator,MACHINE_TYPE,ACCUMULATION_STEPS,LR_FLAG)
         val_loss, val_accuracy,val_auroc = evaluate(epoch,model,val_dataloader,criterion,tokenizer,processor,device,accelerator,MACHINE_TYPE,ACCUMULATION_STEPS,LR_FLAG)
-             
-        logger.info(f'Epoch {epoch} Train loss : {train_loss} Train accuracy : {train_accuracy} Train AUROC : {train_auroc}')
-        logger.info(f'Epoch {epoch} Val loss : {val_loss} Val accuracy : {val_accuracy} Val AUROC : {val_auroc}')
-
         
         ic(epoch,train_loss,val_loss,train_accuracy,val_accuracy,train_auroc,val_auroc)
         
         if accelerator.is_main_process:
+            logger.info(f'Epoch {epoch} Train loss : {train_loss} Train accuracy : {train_accuracy} Train AUROC : {train_auroc}')
+            logger.info(f'Epoch {epoch} Val loss : {val_loss} Val accuracy : {val_accuracy} Val AUROC : {val_auroc}')
+
             ic("True")
             wandb.log({
                 'train_loss': train_loss,

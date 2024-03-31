@@ -24,7 +24,7 @@ if [ "$RUN_TYPE" = "train" ]; then
     rm -rf $CHECKPOINT
     mkdir $CHECKPOINT
     export NUM_NODES=1
-    export EPOCHS=10
+    export EPOCHS=2
     export LOCAL_RANK=0
     export CUDA_VISIBLE_DEVICES=0,1,2
     

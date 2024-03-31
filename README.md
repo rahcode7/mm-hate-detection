@@ -52,7 +52,7 @@ python models/flava/main.py
 test_images/8b52c3.png
 test_images/8b52el.png
 
-## DOCKER 
+## Docker  
 ###### 1. Get requirements
 cd mm-hate-detection
 pip install pipreqs 
