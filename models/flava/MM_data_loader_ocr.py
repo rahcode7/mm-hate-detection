@@ -43,13 +43,23 @@ class FBHMDataset(Dataset):
         
         label = self.lb[idx]["label"]
         
+        
+        # Using text
+        # Option1 Use ocr 
         image_path = os.path.join(self.root_dir,file_name)
         image = Image.open(image_path).convert('RGB')  
-        vals = ast.literal_eval(self.ocr[file_name[4:]])
-        ocr_text = ""
-        for item in vals:
-            ocr_text +=  ". " + item[1]
+
+
+        # vals = ast.literal_eval(self.ocr[file_name[4:]])
+        # ocr_text = ""
+        # for item in vals:
+        #     ocr_text +=  ". " + item[1]
         
+        # Apply mask and inpainting , inputs -> bounding boxes
+        
+        # Option2 Use Ground Truth
+        ocr_text = self.lb[idx]["text"]
+
         # keep alphanum
         ocr_text  = re.sub(r'\W+', ' ', ocr_text).strip()
         #ic(file_name,ocr_text)

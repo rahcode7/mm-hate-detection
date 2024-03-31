@@ -26,6 +26,7 @@ import torch.nn as nn
 from transformers import get_cosine_schedule_with_warmup
 from transformers import AutoTokenizer, FlavaMultimodalModel, AutoProcessor,FlavaModel
 import torch
+import sklearn.metrics
 
 #from utils.helpers import set_seed
 
@@ -47,7 +48,10 @@ class ClassificationHead(nn.Module):
         return self.fc(x)
 
 
-MAX_CNT=10000
+MAX_CNT=5
+
+def flatten(xss):
+    return [x for xs in xss for x in xs]
 
 def train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,scheduler,device,accelerator,MACHINE_TYPE,ACCUMULATION_STEPS,LR_FLAG):
     model.train()
@@ -55,6 +59,8 @@ def train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,s
     train_losses = []
     train_corrects = []
     train_size = [] 
+    probs_list = []
+    labels_list = []
     c = 0 
     classification_head = ClassificationHead(768,num_classes=1)
     classification_head = classification_head.to(device)
@@ -74,7 +80,11 @@ def train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,s
             inputs = processor(text = text, images=images,return_tensors="pt",padding=True)
             #ic(inputs)
             inputs = inputs.to(device)
+
+
+            labels_list.append(labels)
             labels = torch.FloatTensor(labels)
+
             labels = labels.to(device)
             outputs = model(**inputs)
             #ic(outputs.multimodal_output.pooler_output)
@@ -87,6 +97,12 @@ def train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,s
 
 
             probs = torch.sigmoid(logits)
+
+            # Probability list and labels list for AUROC
+            probs_list.append(probs.squeeze().tolist())
+            
+
+
             predicted = np.where(probs >0.5,1,0)
             predicted = torch.Tensor(predicted.squeeze().tolist()).to(device)
 
@@ -101,6 +117,7 @@ def train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,s
 
             ## DDP code
             train_losses.append(accelerator.gather(loss))
+
             #ic(outputs.last_hidden_state)
 
             # preds = model.module.generate(**inputs,max_new_tokens=100)
@@ -143,8 +160,18 @@ def train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,s
     #train_accuracy = torch.sum(torch.cat(train_corrects)) / len(train_dataloader.dataset)
     train_accuracy =  total_corrects / total_train_size
 
-    # ic(train_loss,train_accuracy, torch.sum(torch.cat(train_corrects)))
-    return train_loss,train_accuracy
+    # AUROC 
+    ic(probs_list)
+    ic(labels_list)
+    labels_list = flatten(labels_list)
+    probs_list = flatten(probs_list)
+
+    fpr, tpr, thresholds = sklearn.metrics.roc_curve(y_true = labels_list, y_score = probs_list, pos_label = 1) #positive class is 1; negative class is 0
+    train_auroc = sklearn.metrics.auc(fpr, tpr)
+    
+    ic(train_loss,train_accuracy, torch.sum(torch.cat(train_corrects)),train_auroc)
+
+    return train_loss,train_accuracy,train_auroc
     #return None,None 
 
 def evaluate(epoch,model,val_dataloader,criterion,tokenizer,processor,device,accelerator,MACHINE_TYPE,ACCUMULATION_STEPS,LR_FLAG):
@@ -153,6 +180,9 @@ def evaluate(epoch,model,val_dataloader,criterion,tokenizer,processor,device,acc
     val_losses = []
     val_corrects = []
     val_size = [] 
+    probs_list = []
+    labels_list = []
+
     c = 0 
     classification_head = ClassificationHead(768,num_classes=1)
     classification_head = classification_head.to(device)
@@ -170,6 +200,9 @@ def evaluate(epoch,model,val_dataloader,criterion,tokenizer,processor,device,acc
             inputs = processor(text = text, images=images,return_tensors="pt",padding=True)
             #ic(inputs)
             inputs = inputs.to(device)
+
+            labels_list.append(labels)
+
             labels = torch.FloatTensor(labels)
             labels = labels.to(device)
             outputs = model(**inputs)
@@ -182,12 +215,20 @@ def evaluate(epoch,model,val_dataloader,criterion,tokenizer,processor,device,acc
 
             
             probs = torch.sigmoid(logits)
+
+            # Probability list and labels list for AUROC
+            probs_list.append(probs.squeeze().tolist())
+            
+
+
             predicted = np.where(probs >0.5,1,0)
             predicted = torch.Tensor(predicted.squeeze().tolist()).to(device)
             
             labels = labels.unsqueeze(1)
             loss = criterion(logits.to(device),labels) # .cpu()
             #ic(loss,predicted,labels)
+
+            
 
             ## DDP code
             val_losses.append(accelerator.gather(loss))
@@ -207,16 +248,21 @@ def evaluate(epoch,model,val_dataloader,criterion,tokenizer,processor,device,acc
             val_size.append(gathered_sizes)
 
 
-        total_val_size = torch.sum(torch.cat(val_size)).item()
-        total_corrects = torch.sum(torch.cat(val_corrects)).item()
+    total_val_size = torch.sum(torch.cat(val_size)).item()
+    total_corrects = torch.sum(torch.cat(val_corrects)).item()
 
-        #ic(device,total_corrects,total_val_size)
-        val_loss = torch.sum(torch.cat(val_losses)).item() / len(val_dataloader)
+    #ic(device,total_corrects,total_val_size)
+    val_loss = torch.sum(torch.cat(val_losses)).item() / len(val_dataloader)
 
-        val_accuracy =  total_corrects / total_val_size
+    val_accuracy =  total_corrects / total_val_size
 
+    # AUROC 
+    labels_list = flatten(labels_list)
+    probs_list = flatten(probs_list)
+    fpr, tpr, thresholds = sklearn.metrics.roc_curve(y_true = labels_list, y_score = probs_list, pos_label = 1) #positive class is 1; negative class is 0
+    val_auroc = sklearn.metrics.auc(fpr, tpr)
 
-        return val_loss,val_accuracy
+    return val_loss,val_accuracy,val_auroc
 
 
 
@@ -281,7 +327,9 @@ def run_ddp_accelerate(args):
     val_dataset = FBHMDataset(root_dir=VAL_DIR, split='dev')
     val_dataloader = DataLoader(val_dataset, shuffle=False, batch_size=VAL_BATCH_SIZE, collate_fn= collate_fn,pin_memory=False)
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, weight_decay=0.05)
+
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.001, weight_decay=0.01)
+    #optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, weight_decay=0.05)
     #optimizer = bnb.optim.Adam8bit(model.parameters(), lr=LEARNING_RATE, weight_decay=0.05)
    
     if accelerator.is_main_process:
@@ -363,11 +411,12 @@ def run_ddp_accelerate(args):
     for epoch in range(START,EPOCHS):
         start_time_epoch = time.time()
 
-        train_loss,train_accuracy = train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,scheduler,device,accelerator,MACHINE_TYPE,ACCUMULATION_STEPS,LR_FLAG)
-        val_loss, val_accuracy = evaluate(epoch,model,val_dataloader,criterion,tokenizer,processor,device,accelerator,MACHINE_TYPE,ACCUMULATION_STEPS,LR_FLAG)
+        train_loss,train_accuracy,train_auroc = train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,scheduler,device,accelerator,MACHINE_TYPE,ACCUMULATION_STEPS,LR_FLAG)
+        val_loss, val_accuracy,val_auroc = evaluate(epoch,model,val_dataloader,criterion,tokenizer,processor,device,accelerator,MACHINE_TYPE,ACCUMULATION_STEPS,LR_FLAG)
              
-        logger.info(f'Epoch {epoch} Train loss : {train_loss} Train accuracy : {train_accuracy}')
-        logger.info(f'Epoch {epoch} Val loss : {val_loss} Val accuracy : {val_accuracy}')
+        logger.info(f'Epoch {epoch} Train loss : {train_loss} Train accuracy : {train_accuracy} Train AUROC : {train_auroc}')
+        logger.info(f'Epoch {epoch} Val loss : {val_loss} Val accuracy : {val_accuracy} Val AUROC : {val_auroc}')
+
         
         ic(epoch,train_loss,val_loss,train_accuracy,val_accuracy)
         
@@ -376,8 +425,10 @@ def run_ddp_accelerate(args):
             wandb.log({
                 'train_loss': train_loss,
                 'val_loss': val_loss,
+                'val_auroc': val_auroc,
                 'train_accuracy': train_accuracy,
                 'val_accuracy': val_accuracy,
+                'train_auroc': train_auroc,
                 'epoch': epoch+1
             })      
 

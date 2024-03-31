@@ -7,6 +7,8 @@ cp $LOCAL/models/flava/ocr-extract.py $LOCAL/mm-hate-detection/models/flava/ocr-
 
 
 
+
+##### Image only models
 scp -r /Users/rahulmehta/Desktop/Research24/Challenges/MMHate/datasets/FB-HM/archive.zip rahul.mehta@ada:mm-hate-detection/datasets/FB-HM
 scp $LOCAL/mm-hate-detection/models/flava/ada-script.sh $ADA/models/flava
 scp $LOCAL/mm-hate-detection/models/flava/flava-train.py $ADA/models/flava
@@ -14,19 +16,23 @@ scp $LOCAL/datasets/results/FB-HM/ocr-fbhm.json $ADA/datasets/FB-HM/input-text
 scp $LOCAL/mm-hate-detection/models/flava/MM_data_loader.py $ADA/models/flava/MM_data_loader.py
 
 
+##### datasets
 scp $LOCAL/datasets/FB-HM/data/test.jsonl $ADA/datasets/FB-HM/data
 scp $LOCAL/datasets/FB-HM/data/train.jsonl $ADA/datasets/FB-HM/data
 scp $LOCAL/datasets/FB-HM/data/dev.jsonl $ADA/datasets/FB-HM/data
 
 
+##### OCR model
 scp $LOCAL/datasets/FB-HM/data/ocr-fbhm.json $ADA/datasets/FB-HM/data
+scp $LOCAL/mm-hate-detection/models/flava/MM_data_loader_ocr.py $ADA/models/flava
+scp $LOCAL/mm-hate-detection/models/flava/flava-train-ocr.py $ADA/models/flava
 
 scp $LOCAL/mm-hate-detection/models/flava/main.py $ADA/models/flava
 
 scp -r Users/rahulmehta/Desktop/Research24/Challenges/MMHate/AISG-Online-Safety-Challenge-Submission-Guide/local_test/test_images $ADA/datasets
 ##### Install packages
 python -m pip install torchmultimodal-nightly
-
+pip install pytesseract
 
 ##### OCR
 pip install easyocr
@@ -45,6 +51,12 @@ cat runs/flava/flava.txt
 python models/flava/main.py 
 test_images/8b52c3.png
 test_images/8b52el.png
+
+
+### DOCKER 
+docker build -t sample_mine .
+docker save sample_mine | gzip > mine_container.tar.gz
+
 
 
 #### Debugging errors

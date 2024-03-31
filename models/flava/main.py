@@ -20,16 +20,38 @@ import torch
 import numpy as np
 from PIL import Image
 
-def get_meme_text(reader,image_path):
-    l = reader.readtext(image_path)
-    ic(l)
-    text = ""
-    for item in l:
-        text += ". " + item[1]
+# def get_meme_text(reader,image_path):
+#     l = reader.readtext(image_path)
+#     ic(l)
+#     text = ""
+#     for item in l:
+#         text += ". " + item[1]
+#     ic(text)
+#     # Later - Add coordinates to return for inpainting 
+#     return text
+
+# Pytesseract
+import pytesseract
+from pytesseract import Output
+import cv2
+def get_meme_text_pyt(image_path):
+    image = cv2.imread(image_path)
+
+    config = "-l eng+chi_sim+chi_tra+tam+msa --psm 4 --oem 1"
+
+    text = pytesseract.image_to_string(image, config=config)
     ic(text)
-    # Later - Add coordinates to return for inpainting 
-    return text
     
+    d = pytesseract.image_to_data(image, output_type=Output.DICT, config=config)
+    n_boxes = len(d["level"])
+    coordinates = []
+
+    for i in range(n_boxes):
+        (x, y, w, h) = (d["left"][i], d["top"][i], d["width"][i], d["height"][i])
+        coordinates.append((x, y, w, h))
+
+    return text
+   
 class ClassificationHead(nn.Module):
     def __init__(self, input_size, num_classes):
         super(ClassificationHead, self).__init__()
@@ -80,8 +102,10 @@ def classifier(model_dict,checkpoint_file,device,image,text):
 def process_line_by_line(checkpoint_file,reader,device,model_dict,image_path):
     ic("Processing image")
     image = Image.open(image_path).convert('RGB')  
-    text = get_meme_text(reader,image_path)
     
+    text = get_meme_text(reader,image_path) # Easyocr
+    #text = get_meme_text_pyt(image_path) # Pyt 
+
     proba, label = classifier(model_dict,checkpoint_file,device,image=image, text=text)
 
     return proba, label
