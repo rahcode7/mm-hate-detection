@@ -70,6 +70,7 @@ cp -r $ADA/checkpoints $LOCAL/submissions/submission1
 docker build -t submission1 .
 docker save submission1 | gzip > submission1.tar.gz
 
+cp -r /Users/rahulmehta/.cache/huggingface/hub/models--facebook--flava-full /Users/rahulmehta/Desktop/Research24/Challenges/MMHate/submissions/submission1/.cache
 
 #### Debugging errors
 If you already have done the above, then the distributed data parallel module wasn't able to locate the output tensors in the return value of your module's `forward` function. Please include the loss function and the structure of the return value of `forward` of your module when reporting this issue (e.g. list, dict, iterable).
