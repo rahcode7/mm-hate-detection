@@ -110,7 +110,7 @@ if __name__ == "__main__":
     #reader = easyocr.Reader(['en'])
     reader = ""
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    checkpoint_file="submission1/checkpoints/checkpoints-flava-ddp-base-29Mar/checkpoint_02.pth"
+    checkpoint_file="checkpoints/checkpoints-flava-ddp-base-29Mar/checkpoint_02.pth"
 
     # Load model artifacts 
 
