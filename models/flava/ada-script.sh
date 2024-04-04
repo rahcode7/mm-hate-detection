@@ -2,7 +2,7 @@
 
 #SBATCH --job-name=mm-flava
 #SBATCH -A research
-#SBATCH --output=runs/flava/flava.txt
+#SBATCH --output=runs/flava/logs.txt
 #SBATCH -n 10
 #SBATCH --gres=gpu:3
 #SBATCH --mem=40G
@@ -13,7 +13,7 @@
 
 MODEL='flava'
 MACHINE_TYPE='ddp' # ddp or dp or cpu
-EXP_NAME='base' 
+EXP_NAME='ocr-dev-20e' 
 RUN_TYPE='train' # train,inference
 DATE='29Mar'
 CHECKPOINT="checkpoints/checkpoints-$MODEL-$MACHINE_TYPE-$EXP_NAME-$DATE"
@@ -24,10 +24,9 @@ if [ "$RUN_TYPE" = "train" ]; then
     rm -rf $CHECKPOINT
     mkdir $CHECKPOINT
     export NUM_NODES=1
-    export EPOCHS=2
+    export EPOCHS=20
     export LOCAL_RANK=0
     export CUDA_VISIBLE_DEVICES=0,1,2
-    
     
     # Distributed base
     # torchrun --nnodes 1 --nproc_per_node 3 --rdzv_id=31459 --rdzv_backend=c10d --rdzv_endpoint=127.0.0.1:29900 \    
@@ -48,10 +47,28 @@ if [ "$RUN_TYPE" = "train" ]; then
     #      --val_dir datasets/FB-HM/data --checkpoint_dir  $CHECKPOINT  \
     #      --experiment_name ada-$MODEL-$EXP_NAME-$DATE --wandb_status disabled --accumulation_steps 4 --lr 0
 
-    # OCR 
+    # FLAVA OCR 
     accelerate launch --multi_gpu --num_processes=$NUM_GPUS models/flava/flava-train-ocr.py --num_epochs $EPOCHS --train_batch_size 4 --val_batch_size 4 --train_dir datasets/FB-HM/data \
          --val_dir datasets/FB-HM/data --checkpoint_dir  $CHECKPOINT  \
          --experiment_name ada-$MODEL-$EXP_NAME-$DATE --wandb_status disabled --accumulation_steps 4 --lr 0
+    
+
+    # LLAVA
+    # accelerate launch --multi_gpu --num_processes=$NUM_GPUS models/flava/llava-train-ocr.py --num_epochs $EPOCHS --train_batch_size 4 --val_batch_size 4 --train_dir datasets/FB-HM/data \
+    #      --val_dir datasets/FB-HM/data --checkpoint_dir  $CHECKPOINT  \
+    #      --experiment_name ada-$MODEL-$EXP_NAME-$DATE --wandb_status disabled --accumulation_steps 4 --lr 0
+
+    # # or 
+    # accelerate launch --multi_gpu --num_processes=$NUM_GPUS models/flava/mm-train-ocr.py --num_epochs $EPOCHS --train_batch_size 4 --val_batch_size 4 --train_dir datasets/FB-HM/data \
+    #      --val_dir datasets/FB-HM/data --checkpoint_dir  $CHECKPOINT  \
+    #      --experiment_name ada-$MODEL-$EXP_NAME-$DATE --wandb_status disabled --accumulation_steps 4 --lr 0 --model llava
+
+    # BLIP2
+    # accelerate launch --multi_gpu --num_processes=$NUM_GPUS models/flava/mm-train-ocr.py --num_epochs $EPOCHS --train_batch_size 4 --val_batch_size 4 --train_dir datasets/FB-HM/data \
+    #      --val_dir datasets/FB-HM/data --checkpoint_dir  $CHECKPOINT  \
+    #      --experiment_name ada-$MODEL-$EXP_NAME-$DATE --wandb_status disabled --accumulation_steps 4 --lr 0 --model blip2
+    
+    
     
 
     # MAC single

@@ -53,7 +53,7 @@ class ClassificationHead(nn.Module):
 
         return self.fc(x)
 
-MAX_CNT=10000
+MAX_CNT=100000
 
 def flatten(xss):
     return [x for xs in xss for x in xs]
@@ -175,9 +175,9 @@ def train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,s
     fpr, tpr, thresholds = sklearn.metrics.roc_curve(y_true = labels_list, y_score = probs_list, pos_label = 1) #positive class is 1; negative class is 0
     train_auroc = sklearn.metrics.auc(fpr, tpr)
     
-    ic(train_loss,train_accuracy, torch.sum(torch.cat(train_corrects)),train_auroc)
+    ic(train_loss,train_accuracy,len(labels_list), torch.sum(torch.cat(train_corrects)),train_auroc)
 
-    return train_loss,train_accuracy,train_auroc
+    return train_loss,train_accuracy,train_auroc,labels_list,probs_list
     #return None,None 
 
 def evaluate(epoch,model,val_dataloader,criterion,tokenizer,processor,device,accelerator,MACHINE_TYPE,ACCUMULATION_STEPS,LR_FLAG):
@@ -271,7 +271,10 @@ def evaluate(epoch,model,val_dataloader,criterion,tokenizer,processor,device,acc
     fpr, tpr, thresholds = sklearn.metrics.roc_curve(y_true = labels_list, y_score = probs_list, pos_label = 1) #positive class is 1; negative class is 0
     val_auroc = sklearn.metrics.auc(fpr, tpr)
 
-    return val_loss,val_accuracy,val_auroc
+
+    ic(val_loss,val_accuracy,len(labels_list),torch.sum(torch.cat(val_corrects)),val_auroc)
+    return val_loss,val_accuracy,val_auroc,labels_list,probs_list
+
 
 
 
@@ -288,6 +291,7 @@ def run_ddp_accelerate(args):
     MACHINE_TYPE="ddp"
     LR_FLAG=args.lr
     ACCUMULATION_STEPS=args.accumulation_steps
+    
 
     LR_FLAG=False
     if args.lr == 1: LR_FLAG=True 
@@ -337,8 +341,8 @@ def run_ddp_accelerate(args):
     val_dataloader = DataLoader(val_dataset, shuffle=False, batch_size=VAL_BATCH_SIZE, collate_fn= collate_fn,pin_memory=False)
 
 
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.001, weight_decay=0.01)
-    #optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, weight_decay=0.05)
+    #optimizer = torch.optim.SGD(model.parameters(), lr=1e-5, weight_decay=0.01)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5, weight_decay=0.05)
     #optimizer = bnb.optim.Adam8bit(model.parameters(), lr=LEARNING_RATE, weight_decay=0.05)
    
     if accelerator.is_main_process:
@@ -361,7 +365,7 @@ def run_ddp_accelerate(args):
     stats_name = 'statistics'
     prev_accuracy = []
     prev_epoch = []
-    best_accuracy = [0, 0.0]
+    best_auroc = [0, 0.0]
 
     file_list = os.listdir(CHECKPOINT_DIR)
     ic(file_list)
@@ -420,12 +424,28 @@ def run_ddp_accelerate(args):
     for epoch in range(START,EPOCHS):
         start_time_epoch = time.time()
 
-        train_loss,train_accuracy,train_auroc = train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,scheduler,device,accelerator,MACHINE_TYPE,ACCUMULATION_STEPS,LR_FLAG)
-        val_loss, val_accuracy,val_auroc = evaluate(epoch,model,val_dataloader,criterion,tokenizer,processor,device,accelerator,MACHINE_TYPE,ACCUMULATION_STEPS,LR_FLAG)
+        train_loss,train_accuracy,train_auroc,train_labels,train_probs = train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,scheduler,device,accelerator,MACHINE_TYPE,ACCUMULATION_STEPS,LR_FLAG)
+        val_loss, val_accuracy,val_auroc,val_labels,val_probs = evaluate(epoch,model,val_dataloader,criterion,tokenizer,processor,device,accelerator,MACHINE_TYPE,ACCUMULATION_STEPS,LR_FLAG)
         
-        ic(epoch,train_loss,val_loss,train_accuracy,val_accuracy,train_auroc,val_auroc)
         
         if accelerator.is_main_process:
+            fpr, tpr, thresholds = sklearn.metrics.roc_curve(y_true = train_labels, y_score = train_probs , pos_label = 1) #positive class is 1; negative class is 0
+            train_auroc = sklearn.metrics.auc(fpr, tpr)
+            ic(train_auroc)
+
+            fpr, tpr, thresholds = sklearn.metrics.roc_curve(y_true = val_labels, y_score = val_probs , pos_label = 1) #positive class is 1; negative class is 0
+            val_auroc = sklearn.metrics.auc(fpr, tpr)
+            ic(val_auroc)
+
+            ic(epoch,train_loss,val_loss,train_accuracy,val_accuracy,train_auroc,val_auroc)
+            
+            auroc_dict = {
+                'train_labels': train_labels,
+                'train_probs': train_probs,
+                'val_labels':val_labels,
+                'val_probs' : val_probs
+            }
+
             logger.info(f'Epoch {epoch} Train loss : {train_loss} Train accuracy : {train_accuracy} Train AUROC : {train_auroc}')
             logger.info(f'Epoch {epoch} Val loss : {val_loss} Val accuracy : {val_accuracy} Val AUROC : {val_auroc}')
 
@@ -452,17 +472,26 @@ def run_ddp_accelerate(args):
                 ic("Saving 0 epoch checkpoint")
                 torch.save(save_obj, os.path.join(
                     CHECKPOINT_DIR, 'checkpoint_%02d.pth' % epoch))
-                best_accuracy[0] = epoch 
-                best_accuracy[1] = float(val_accuracy)
+                best_auroc[0] = epoch 
+                best_auroc[1] = float(val_accuracy)
 
-            elif val_accuracy > best_accuracy[1] and epoch > 0:
+                with open(os.path.join(CHECKPOINT_DIR,'auroc.json'), "w") as outfile: 
+                    json.dump(auroc_dict, outfile)
+
+
+            #elif val_accuracy > best_accuracy[1] and epoch > 0:
+            elif val_auroc > best_auroc[1] and epoch >0 :
                 os.remove(os.path.join(CHECKPOINT_DIR,
-                        'checkpoint_%02d.pth' % best_accuracy[0]))
+                        'checkpoint_%02d.pth' % best_auroc[0]))
                 ic("old checkpoint removed")
-                best_accuracy[0] = epoch
-                best_accuracy[1] = float(val_accuracy)
+                best_auroc[0] = epoch
+                best_auroc[1] = float(val_accuracy)
                 torch.save(save_obj, os.path.join(
                     CHECKPOINT_DIR, 'checkpoint_%02d.pth' % epoch))
+                
+                with open(os.path.join(CHECKPOINT_DIR,'auroc.json'), "w") as outfile: 
+                    json.dump(auroc_dict, outfile)
+                    
             else:
                 pass
 

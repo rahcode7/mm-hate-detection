@@ -29,7 +29,15 @@ scp $LOCAL/mm-hate-detection/models/flava/flava-train-ocr.py $ADA/models/flava
 
 scp $LOCAL/mm-hate-detection/models/flava/main.py $ADA/models/flava
 
-scp -r Users/rahulmehta/Desktop/Research24/Challenges/MMHate/AISG-Online-Safety-Challenge-Submission-Guide/local_test/test_images $ADA/datasets
+scp $ADA/models/
+<!-- /Users/rahulmehta/Desktop/Research24/Challenges/MMHate/mm-hate-detection/models/flava/mm-train-ocr.py -->
+
+
+scp -r Users/rahulmehta/Desktop/Research24/Challenges/MMHate/AISG-Online-Safety-Challenge-Submission-Guide/local_test/
+
+
+
+test_images $ADA/datasets
 ##### Install packages
 python -m pip install torchmultimodal-nightly
 pip install pytesseract
@@ -42,15 +50,45 @@ reader = easyocr.Reader(['ch_sim','en'])
 result = reader.readtext('Examples/chinese.jpg')
 
 
-#### FLAVA Run
+#### Model 1 - FLAVA
 sbatch models/flava/ada-script.sh 
 squeue -u $USER
 cat runs/flava/flava.txt
 
-### Inference
+###### Inference
 python models/flava/main.py 
 test_images/8b52c3.png
 test_images/8b52el.png
+
+
+#### Model 2 - LLAVA 
+sbatch models/flava/ada-script.sh 
+squeue -u $USER
+cat runs/llava/llava.txt
+
+### OCR Pytesseract
+
+TESSDATA_DIR="/opt/local/share/tessdata/"
+
+# Download English traineddata
+sudo wget -P "$TESSDATA_DIR" https://github.com/tesseract-ocr/tessdata/raw/main/eng.traineddata
+
+# Download Simplified Chinese traineddata
+sudo wget -P "$TESSDATA_DIR" https://github.com/tesseract-ocr/tessdata/raw/main/chi_sim.traineddata
+
+# Download Traditional Chinese traineddata
+sudo wget -P "$TESSDATA_DIR" https://github.com/tesseract-ocr/tessdata/raw/main/chi_tra.traineddata
+
+# Download Tamil traineddata
+sudo wget -P "$TESSDATA_DIR" https://github.com/tesseract-ocr/tessdata/raw/main/tam.traineddata
+
+# Download Malay trainneddata
+sudo wget -P "$TESSDATA_DIR" https://github.com/tesseract-ocr/tessdata/raw/main/msa.traineddata 
+
+
+sudo wget -P "$TESSDATA_DIR" https://github.com/tesseract-ocr/tessdata/raw/main/osd.traineddata 
+
+
 
 ## Docker  
 ###### 1. Get requirements
@@ -71,6 +109,34 @@ docker build -t submission1 .
 docker save submission1 | gzip > submission1.tar.gz
 
 cp -r /Users/rahulmehta/.cache/huggingface/hub/models--facebook--flava-full /Users/rahulmehta/Desktop/Research24/Challenges/MMHate/submissions/submission1/.cache
+
+# Test docker 
+docker network create \                           
+    --driver "$ISOLATED_DOCKER_NETWORK_DRIVER" \
+    $( [ "$ISOLATED_DOCKER_NETWORK_INTERNAL" = "true" ] && echo "--internal" ) \
+    --subnet "$ISOLATED_DOCKER_NETWORK_SUBNET" \
+    "$ISOLATED_DOCKER_NETWORK_NAME"
+f8a7e2417db5faf990d10b9b2d08464704c9990ab8a779a8682e64e27a737209
+
+ISOLATED_DOCKER_NETWORK_NAME=exec_env_jail_network
+cat local_test/test_stdin/stdin.csv | \
+docker run --init \
+        --attach "stdin" \
+        --attach "stdout" \
+        --attach "stderr" \
+        --cpus 1 \
+        --memory 4g \
+        --memory-swap 0 \
+        --ulimit nproc=1024 \
+        --ulimit nofile=1024 \
+        --network exec_env_jail_network \
+        --read-only \
+        --mount type=bind,source="$(pwd)"/local_test/test_images,target=/images,readonly \
+        --mount type=tmpfs,destination=/tmp,tmpfs-size=5368709120,tmpfs-mode=1777 \
+        --interactive \
+        submission1 \
+ 1>local_test/test_output/stdout.csv \
+ 2>local_test/test_output/stderr.csv
 
 #### Debugging errors
 If you already have done the above, then the distributed data parallel module wasn't able to locate the output tensors in the return value of your module's `forward` function. Please include the loss function and the structure of the return value of `forward` of your module when reporting this issue (e.g. list, dict, iterable).
