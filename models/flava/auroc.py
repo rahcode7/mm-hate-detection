@@ -26,7 +26,6 @@ if __name__ == "__main__":
     train_auroc = sklearn.metrics.auc(fpr, tpr)
     ic(train_auroc)
 
-
     val_labels = auroc_dict['val_labels']
     val_probs =  auroc_dict['val_probs']
 

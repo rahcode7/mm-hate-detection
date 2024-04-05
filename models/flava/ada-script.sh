@@ -13,7 +13,7 @@
 
 MODEL='flava'
 MACHINE_TYPE='ddp' # ddp or dp or cpu
-EXP_NAME='ocr-dev-20e' 
+EXP_NAME='ocr-dev-tran' 
 RUN_TYPE='train' # train,inference
 DATE='29Mar'
 CHECKPOINT="checkpoints/checkpoints-$MODEL-$MACHINE_TYPE-$EXP_NAME-$DATE"
@@ -24,7 +24,7 @@ if [ "$RUN_TYPE" = "train" ]; then
     rm -rf $CHECKPOINT
     mkdir $CHECKPOINT
     export NUM_NODES=1
-    export EPOCHS=20
+    export EPOCHS=5
     export LOCAL_RANK=0
     export CUDA_VISIBLE_DEVICES=0,1,2
     
@@ -67,14 +67,11 @@ if [ "$RUN_TYPE" = "train" ]; then
     # accelerate launch --multi_gpu --num_processes=$NUM_GPUS models/flava/mm-train-ocr.py --num_epochs $EPOCHS --train_batch_size 4 --val_batch_size 4 --train_dir datasets/FB-HM/data \
     #      --val_dir datasets/FB-HM/data --checkpoint_dir  $CHECKPOINT  \
     #      --experiment_name ada-$MODEL-$EXP_NAME-$DATE --wandb_status disabled --accumulation_steps 4 --lr 0 --model blip2
-    
-    
-    
 
     # MAC single
-    #  accelerate launch  --num_processes=$NUM_GPUS models/flava/flava-train.py --num_epochs $EPOCHS --train_batch_size 2 --val_batch_size 2 --train_dir /Users/rahulmehta/Desktop/Research24/Challenges/MMHate/datasets/FB-HM/data \
+    # accelerate launch  --num_processes=$NUM_GPUS models/flava/flava-train-ocr.py --num_epochs $EPOCHS --train_batch_size 4 --val_batch_size 4 --train_dir /Users/rahulmehta/Desktop/Research24/Challenges/MMHate/datasets/FB-HM/data \
     #     --val_dir /Users/rahulmehta/Desktop/Research24/Challenges/MMHate/datasets/FB-HM/data --checkpoint_dir  $CHECKPOINT  \
-    #     --experiment_name ada-$MODEL-$EXP_NAME-$DATE --wandb_status offline --accumulation_steps 4 --lr 1
+    #     --experiment_name ada-$MODEL-$EXP_NAME-$DATE --wandb_status offline --accumulation_steps 4 --lr 0
 
 elif [ "$RUN_TYPE" = "inference" ]; then 
     echo "Running Inference"

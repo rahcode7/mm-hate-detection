@@ -6,64 +6,11 @@ import json
 from icecream import ic 
 import ast 
 import re
-import cv2
 import numpy as np 
-import pytesseract
-from pytesseract import Output
-
-def get_meme_text(image):
-    config = "-l eng+chi_sim+chi_tra+tam+msa --psm 4 --oem 1"
-
-    text = pytesseract.image_to_string(image, config=config)
-    d = pytesseract.image_to_data(image, output_type=Output.DICT, config=config)
-    n_boxes = len(d["level"])
-    coordinates = []
-
-    for i in range(n_boxes):
-        (x, y, w, h) = (d["left"][i], d["top"][i], d["width"][i], d["height"][i])
-        coordinates.append((x, y, w, h))
-    return text, coordinates
-
-
-def get_image_mask(image, coordinates_to_mask):
-    # Create a mask image with image_size
-    image_mask = np.zeros_like(image[:, :, 0])
-
-    for coordinates in coordinates_to_mask:
-        # unpack the coordinates
-        x, y, w, h = coordinates
-
-        # set mask to 255 for coordinates
-        image_mask[y : y + h, x : x + w] = 255
-
-    return image_mask
-
-def get_image_inpainted(image, image_mask):
-    # Perform image inpainting to remove text from the original image
-    image_inpainted = cv2.inpaint(
-        image, image_mask, inpaintRadius=3, flags=cv2.INPAINT_TELEA
-    )
-
-    return image_inpainted
-
-def get_meme_text(image):
-    config = "-l eng+chi_sim+chi_tra+tam+msa --psm 4 --oem 1"
-    #config = "-l chi_tra --psm 4 --oem 1"
-
-    text = pytesseract.image_to_string(image, config)
-
-    text = pytesseract.image_to_string(image, config=config)
-    d = pytesseract.image_to_data(image, output_type=Output.DICT, config=config)
-    n_boxes = len(d["level"])
-    coordinates = []
-
-    for i in range(n_boxes):
-        (x, y, w, h) = (d["left"][i], d["top"][i], d["width"][i], d["height"][i])
-        coordinates.append((x, y, w, h))
-    return text, coordinates
+from langdetect import detect
 
 class FBHMDataset(Dataset):
-    def __init__(self,root_dir,split) -> None:
+    def __init__(self,translation_model,tokenizer,root_dir,split,translate=False) -> None:
         splitfile = split + '.jsonl'
         data = []
         
@@ -88,6 +35,10 @@ class FBHMDataset(Dataset):
         self.split = split
 
         self.root_dir = root_dir
+
+        self.model =translation_model
+        self.tokenizer=tokenizer
+        self.translate=translate
     
     def __len__(self):
         return len(self.lb)
@@ -106,7 +57,7 @@ class FBHMDataset(Dataset):
             vals = ast.literal_eval(self.ocr[file_name[4:]])
             ocr_text = ""
             for item in vals:
-                ocr_text +=  ". " + item[1] # 1st item is OCR text 
+                ocr_text +=  " " + item[1] # 1st item is OCR text 
                 bbox.append(item[0]) # 0th item is bounding box of the text
             #ic("Dev",file_name,ocr_text)
 
@@ -117,6 +68,17 @@ class FBHMDataset(Dataset):
         else:
             ocr_text = ""
         
+        if self.translate:
+            detected_lang = detect(ocr_text)
+            if  detected_lang in  ['ko','ja','zh']:
+                #ic(detected_lang)
+                # Chinese to english translate
+                self.tokenizer.src_lang = "zh"
+                encoded_zh = self.tokenizer(ocr_text, return_tensors="pt")
+                generated_tokens = self.model.generate(**encoded_zh, forced_bos_token_id=self.tokenizer.get_lang_id("en"))
+                ocr_text = self.tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+                ic(ocr_text)
+
 
         # Apply mask and inpainting , inputs -> bounding boxes
         # for coordinates in bbox:

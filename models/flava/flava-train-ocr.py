@@ -11,12 +11,13 @@ from icecream import ic
 import argparse
 import wandb
 import os 
+from utils.helpers import set_seed
 from torch.utils.data import DataLoader
 from accelerate import Accelerator
 from accelerate import DistributedDataParallelKwargs
 import bitsandbytes as bnb
-from torchmultimodal.models.flava.model import flava_model_for_classification
-from MM_data_loader_ocr import FBHMDataset,collate_fn
+#from torchmultimodal.models.flava.model import flava_model_for_classification
+from MM_data_loader_ocr import FBHMDataset,collate_fn # change for different ocr types
 from transformers import get_cosine_schedule_with_warmup
 from tqdm import tqdm 
 import json 
@@ -27,6 +28,7 @@ from transformers import get_cosine_schedule_with_warmup
 from transformers import AutoTokenizer, FlavaMultimodalModel, AutoProcessor,FlavaModel
 import torch
 import sklearn.metrics
+from transformers import M2M100ForConditionalGeneration, M2M100Tokenizer
 
 #from utils.helpers import set_seed
 
@@ -53,7 +55,7 @@ class ClassificationHead(nn.Module):
 
         return self.fc(x)
 
-MAX_CNT=100000
+MAX_CNT=5
 
 def flatten(xss):
     return [x for xs in xss for x in xs]
@@ -71,6 +73,7 @@ def train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,s
     classification_head = classification_head.to(device)
 
     for idx, (files,images,text,labels) in enumerate(tqdm(train_dataloader)):
+        
         c+=1
         if c>MAX_CNT:
             break
@@ -181,7 +184,8 @@ def train(epoch,model,train_dataloader,criterion,tokenizer,processor,optimizer,s
     #return None,None 
 
 def evaluate(epoch,model,val_dataloader,criterion,tokenizer,processor,device,accelerator,MACHINE_TYPE,ACCUMULATION_STEPS,LR_FLAG):
-    model.train()
+    
+    model.eval()
 
     val_losses = []
     val_corrects = []
@@ -196,6 +200,7 @@ def evaluate(epoch,model,val_dataloader,criterion,tokenizer,processor,device,acc
     with torch.no_grad():
         model.eval()
         for idx, (files,images,text,labels) in enumerate(tqdm(val_dataloader)):
+            ic(text,files)
             c+=1
             if c>MAX_CNT:
                 break
@@ -334,10 +339,16 @@ def run_ddp_accelerate(args):
     model = FlavaModel.from_pretrained("facebook/flava-full")
     processor = AutoProcessor.from_pretrained("facebook/flava-full")
 
-    train_dataset = FBHMDataset(root_dir=TRAIN_DIR,split='train')
+    
+
+    tran_model = M2M100ForConditionalGeneration.from_pretrained("facebook/m2m100_418M")
+    tran_tokenizer = M2M100Tokenizer.from_pretrained("facebook/m2m100_418M")
+
+
+    train_dataset = FBHMDataset(tran_model,tran_tokenizer,root_dir=TRAIN_DIR,split='train',translate=True)
     train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=TRAIN_BATCH_SIZE, collate_fn= collate_fn,pin_memory=False)
 
-    val_dataset = FBHMDataset(root_dir=VAL_DIR, split='dev')
+    val_dataset = FBHMDataset(tran_model,tran_tokenizer,root_dir=VAL_DIR,split='dev',translate=True)
     val_dataloader = DataLoader(val_dataset, shuffle=False, batch_size=VAL_BATCH_SIZE, collate_fn= collate_fn,pin_memory=False)
 
 
@@ -473,7 +484,7 @@ def run_ddp_accelerate(args):
                 torch.save(save_obj, os.path.join(
                     CHECKPOINT_DIR, 'checkpoint_%02d.pth' % epoch))
                 best_auroc[0] = epoch 
-                best_auroc[1] = float(val_accuracy)
+                best_auroc[1] = float(val_auroc)
 
                 with open(os.path.join(CHECKPOINT_DIR,'auroc.json'), "w") as outfile: 
                     json.dump(auroc_dict, outfile)
@@ -485,7 +496,7 @@ def run_ddp_accelerate(args):
                         'checkpoint_%02d.pth' % best_auroc[0]))
                 ic("old checkpoint removed")
                 best_auroc[0] = epoch
-                best_auroc[1] = float(val_accuracy)
+                best_auroc[1] = float(val_auroc)
                 torch.save(save_obj, os.path.join(
                     CHECKPOINT_DIR, 'checkpoint_%02d.pth' % epoch))
                 
@@ -510,6 +521,7 @@ if __name__ == "__main__":
     #wandb.login(key='ce18e8ae96d72cd78a7a54de441e9657bc0a913d')
     parser = argparse.ArgumentParser()
     #set_seed(42)
+    set_seed(42)
 
     parser.add_argument('--num_epochs', default=1,
                         type=int, help='number of epochs')

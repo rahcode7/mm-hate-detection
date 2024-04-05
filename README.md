@@ -6,8 +6,6 @@ cp $LOCAL/models/flava/flava-train.py $LOCAL/mm-hate-detection/models/flava/flav
 cp $LOCAL/models/flava/ocr-extract.py $LOCAL/mm-hate-detection/models/flava/ocr-extract.py
 
 
-
-
 ##### Image only models
 scp -r /Users/rahulmehta/Desktop/Research24/Challenges/MMHate/datasets/FB-HM/archive.zip rahul.mehta@ada:mm-hate-detection/datasets/FB-HM
 scp $LOCAL/mm-hate-detection/models/flava/ada-script.sh $ADA/models/flava
@@ -90,33 +88,53 @@ sudo wget -P "$TESSDATA_DIR" https://github.com/tesseract-ocr/tessdata/raw/main/
 
 
 
+export SUBMISSION_ID=submission2 
+
+
+# EasyOCR donwload
+cp ~/.EasyOCR/model/english_g2.pth $LOCAL/submissions/$SUBMISSION_ID/.cache
+cp ~/.EasyOCR/model/zh_sim_g2.pth $LOCAL/submissions/$SUBMISSION_ID/.cache
+
 ## Docker  
 ###### 1. Get requirements
-cd mm-hate-detection
+
+cd submissions/$SUBMISSION_ID
 pip install pipreqs 
 pipreqs . 
-scp $ADA/requirements.txt $LOCAL/mm-hate-detection
 
 ###### 2. Get trained checkpoint file
-scp -r $ADA/checkpoints/checkpoints-flava-ddp-base-29Mar $LOCAL/checkpoints
+mkdir $SUBMISSION_ID/checkpoints
+
+scp -r $ADA/checkpoints/checkpoints-flava-ddp-ocr-dev-29Mar $LOCAL/checkpoints
 
 ###### 3. Move main.py to submission
 cp $ADA/mm-hate-detection/models/flava/main.py $LOCAL/submissions/submission1
 cp -r $ADA/checkpoints $LOCAL/submissions/submission1
 
-###### 3. DOCKER build image from submission folder
-docker build -t submission1 .
-docker save submission1 | gzip > submission1.tar.gz
+###### 4 Get models HF
 
-cp -r /Users/rahulmehta/.cache/huggingface/hub/models--facebook--flava-full /Users/rahulmehta/Desktop/Research24/Challenges/MMHate/submissions/submission1/.cache
+mkdir SUBMISSION_ID/.cache
+cp -r /Users/rahulmehta/.cache/huggingface/hub/models--facebook--flava-full /Users/rahulmehta/Desktop/Research24/Challenges/MMHate/submissions/SUBMISSION_ID/.cache
+
+cp -r /Users/rahulmehta/.cache/huggingface/hub/models--facebook--m2m100_418M /Users/rahulmehta/Desktop/Research24/Challenges/MMHate/submissions/SUBMISSION_ID/.cache
+
+
+###### 3. DOCKER build image from submission folder
+
+docker build -t $SUBMISSION_ID .
+docker save $SUBMISSION_ID | gzip > $SUBMISSION_ID.tar.gz
+
 
 # Test docker 
-docker network create \                           
+
+docker network create \
     --driver "$ISOLATED_DOCKER_NETWORK_DRIVER" \
     $( [ "$ISOLATED_DOCKER_NETWORK_INTERNAL" = "true" ] && echo "--internal" ) \
     --subnet "$ISOLATED_DOCKER_NETWORK_SUBNET" \
     "$ISOLATED_DOCKER_NETWORK_NAME"
-f8a7e2417db5faf990d10b9b2d08464704c9990ab8a779a8682e64e27a737209
+
+docker system prune -a
+
 
 ISOLATED_DOCKER_NETWORK_NAME=exec_env_jail_network
 cat local_test/test_stdin/stdin.csv | \
@@ -134,7 +152,7 @@ docker run --init \
         --mount type=bind,source="$(pwd)"/local_test/test_images,target=/images,readonly \
         --mount type=tmpfs,destination=/tmp,tmpfs-size=5368709120,tmpfs-mode=1777 \
         --interactive \
-        submission1 \
+        submission2 \
  1>local_test/test_output/stdout.csv \
  2>local_test/test_output/stderr.csv
 

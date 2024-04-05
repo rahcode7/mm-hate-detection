@@ -13,7 +13,7 @@ if __name__ == "__main__":
     IMG_PATH = "/Users/rahulmehta/Desktop/Research24/Challenges/MMHate/datasets/FB-HM/data/img" 
     OUTPUT_PATH = "/Users/rahulmehta/Desktop/Research24/Challenges/MMHate/datasets/results/FB-HM"
     #01235.png
-
+    
     # detect language - English, singlish etc
     reader = easyocr.Reader(['en'])
 
@@ -37,12 +37,7 @@ if __name__ == "__main__":
                 f.write('\n')
                 f.close()
 
-    # read ocr
-    # reader = easyocr.Reader(['ch_sim','en']) # this needs to run only once to load the model into memory
-    # result = reader.readtext('chinese.jpg')
-
-    # get english text or other language text -> translate to english
-
+    
 
 
 

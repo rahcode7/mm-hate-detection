@@ -1,0 +1,66 @@
+{
+    "os": "macOS-13.5.1-x86_64-i386-64bit",
+    "python": "3.10.13",
+    "heartbeatAt": "2024-04-05T03:04:30.011311",
+    "startedAt": "2024-04-05T03:04:29.938416",
+    "docker": null,
+    "cuda": null,
+    "args": [
+        "--num_epochs",
+        "1",
+        "--train_batch_size",
+        "4",
+        "--val_batch_size",
+        "4",
+        "--train_dir",
+        "/Users/rahulmehta/Desktop/Research24/Challenges/MMHate/datasets/FB-HM/data",
+        "--val_dir",
+        "/Users/rahulmehta/Desktop/Research24/Challenges/MMHate/datasets/FB-HM/data",
+        "--checkpoint_dir",
+        "checkpoints/checkpoints-flava-ddp-ocr-dev-pyt-inp-29Mar",
+        "--experiment_name",
+        "ada-flava-ocr-dev-pyt-inp-29Mar",
+        "--wandb_status",
+        "offline",
+        "--accumulation_steps",
+        "4",
+        "--lr",
+        "0"
+    ],
+    "state": "running",
+    "program": "/Users/rahulmehta/Desktop/Research24/Challenges/MMHate/mm-hate-detection/models/flava/flava-train-ocr.py",
+    "codePathLocal": "models/flava/flava-train-ocr.py",
+    "codePath": "models/flava/flava-train-ocr.py",
+    "git": {
+        "remote": "https://github.com/rahcode7/mm-hate-detection.git",
+        "commit": "68b04a7f15035773705230cb8da8ac5ec03032fc"
+    },
+    "email": "rahul008mehta@gmail.com",
+    "root": "/Users/rahulmehta/Desktop/Research24/Challenges/MMHate/mm-hate-detection",
+    "host": "HYD-M-57011056",
+    "username": "rahulmehta",
+    "executable": "/Users/rahulmehta/.conda/envs/llava/bin/python3.10",
+    "cpu_count": 10,
+    "cpu_count_logical": 10,
+    "cpu_freq": {
+        "current": 2400,
+        "min": 2400,
+        "max": 2400
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 2400,
+            "min": 2400,
+            "max": 2400
+        }
+    ],
+    "disk": {
+        "/": {
+            "total": 926.3517189025879,
+            "used": 668.480297088623
+        }
+    },
+    "memory": {
+        "total": 64.0
+    }
+}
