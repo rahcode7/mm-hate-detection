@@ -55,7 +55,7 @@ class ClassificationHead(nn.Module):
 
         return self.fc(x)
 
-MAX_CNT=5
+MAX_CNT=10000
 
 def flatten(xss):
     return [x for xs in xss for x in xs]
@@ -200,7 +200,7 @@ def evaluate(epoch,model,val_dataloader,criterion,tokenizer,processor,device,acc
     with torch.no_grad():
         model.eval()
         for idx, (files,images,text,labels) in enumerate(tqdm(val_dataloader)):
-            ic(text,files)
+            #ic(text,files)
             c+=1
             if c>MAX_CNT:
                 break
