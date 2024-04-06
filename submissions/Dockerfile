@@ -3,6 +3,13 @@
 
 FROM python:3.10
 
+
+RUN useradd -ms /bin/bash admin
+USER admin 
+
+WORKDIR /home/admin/app
+
+
 # Install necessary libraries; tesseract & dependencies for opencv
 # RUN apt-get update && \
 #     apt-get install -y tesseract-ocr libgtk-3-dev \
@@ -13,29 +20,14 @@ FROM python:3.10
 #     libgstreamer-plugins-base1.0-dev libgstreamer1.0-dev libgl1-mesa-dev libglib2.0-0 
 
 # Set the working directory in the container
-WORKDIR /app
+#WORKDIR /app
 
 # Copy your Python script into the container at /app
-COPY . /app/
-
+COPY . /home/admin/app
 # Install & download neccessary files required
 #RUN ./install.sh
 
 # Install python requirements
 RUN pip install -r requirements.txt
-
-COPY .cache/english_g2.pth ~/.EasyOCR/model
-COPY .cache/zh_sim_g2.pth ~/.EasyOCR/model
-  
-
-RUN ls .
-RUN pwd
-
-# RUN chmod -R 777 root/.EasyOCR
-# RUN mkdir root/.EasyOCR/model
-
-# COPY .cache/english_g2.pth root/.EasyOCR/model
-# COPY .cache/zh_sim_g2.pth root/.EasyOCR/model
-
 
 ENTRYPOINT ["python3", "main.py"]
